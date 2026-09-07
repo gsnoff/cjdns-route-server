@@ -2,7 +2,7 @@
 
 use std::{convert::TryFrom, fmt};
 
-use bencode::object::{Dict, Object, Get};
+use bencode::object::{Dict, Get as _, Object};
 use eyre::{bail, eyre, Context};
 
 /// List of available remote functions.
@@ -55,9 +55,7 @@ impl Funcs {
     pub(super) fn add_funcs(&mut self, fns: &Dict<'_>) -> eyre::Result<()> {
         let Funcs(list) = self;
         for (fn_name, fn_descr) in fns.iter() {
-            let func = Self::parse_fn(
-                String::from_utf8(fn_name.to_vec())?,
-                fn_descr.clone())?;
+            let func = Self::parse_fn(String::from_utf8(fn_name.to_vec())?, fn_descr.clone())?;
             list.push(func);
         }
         list.sort_by(|a, b| String::cmp(&a.name, &b.name));
@@ -71,11 +69,10 @@ impl Funcs {
         for (arg_name, arg_descr) in dict.iter() {
             let arg_name = String::from_utf8(arg_name.to_vec())?;
             let arg_desc = arg_descr.as_dict()?;
-            let arg_type = arg_desc.try_get_str("type")?
-                .ok_or_else(|| eyre!("Missing arg type in argument {arg_name}"))?;
-            let typ = ArgType::try_from(arg_type).with_context(||
-                format!("Function {} argument {}: invalid type {}", fn_name, arg_name, arg_type))?;
-            let required = arg_desc.try_get_int("required")?
+            let arg_type = arg_desc.try_get_str("type")?.ok_or_else(|| eyre!("Missing arg type in argument {arg_name}"))?;
+            let typ = ArgType::try_from(arg_type).with_context(|| format!("Function {fn_name} argument {arg_name}: invalid type {arg_type}"))?;
+            let required = arg_desc
+                .try_get_int("required")?
                 .ok_or_else(|| eyre!("Missing arg required in argument {arg_name}"))?;
             let arg = Arg {
                 name: arg_name,
@@ -125,7 +122,7 @@ impl TryFrom<&str> for ArgType {
             "String" => Self::String,
             "List" => Self::List,
             "Dict" => Self::Dict,
-            x => bail!("Unknown arg type {}", x)
+            x => bail!("Unknown arg type {}", x),
         })
     }
 }

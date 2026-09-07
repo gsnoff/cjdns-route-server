@@ -8,7 +8,7 @@ use cjdns_bencode::object::{Dict,Get};
 use eyre::{Error,OptionExt};
 use tokio::{select, time};
 
-use cjdns_admin::Connection;
+use cjdns_admin::{cjdns_invoke, Connection};
 use cjdns_core::{Address, RoutingLabel};
 use cjdns_hdr::RouteHeader;
 use cjdns_keys::{CJDNSPublicKey, CJDNS_IP6};
@@ -91,9 +91,7 @@ async fn check_connection_alive(mut cjdns: Connection) -> Result<(), Error> {
 }
 
 async fn count_handlers(cjdns: &mut Connection) -> Result<usize, Error> {
-    let mut args = Dict::new();
-    args.insert("page", 0);
-    let ret = cjdns.invoke("UpperDistributor_listHandlers", args).await?;
+    let ret = cjdns_invoke!(cjdns, "UpperDistributor_listHandlers", page = 0).await?;
     Ok(ret.get_list("handlers")?.len())
 }
 

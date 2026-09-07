@@ -101,7 +101,7 @@ impl Sniffer {
     async fn connect_with_existing_port(conn: &mut Connection, content_type_code: u32) -> Result<Option<UdpSocket>, ConnectError> {
         // Request list of handlers
         for page in 0.. {
-            let res = cjdns_invoke!(conn, "UpperDistributor_listHandlers", "page" = page)
+            let res = cjdns_invoke!(conn, "UpperDistributor_listHandlers", page)
                 .await
                 .map_err(|e| ConnectError::RpcError(e))?;
             // Expected response is of form `{ "handlers" : [ { "type" : 0xFFF1, "udpPort" : 1234 }, { "type" : 0xFFF2, "udpPort" : 1235 }, ... ] }`
@@ -153,8 +153,8 @@ impl Sniffer {
         cjdns_invoke!(
             conn,
             "UpperDistributor_registerHandler",
-            "contentType" = content_type_code as i64,
-            "udpPort" = port as i64
+            contentType = content_type_code as i64,
+            udpPort = port as i64
         )
         .await
         .map_err(|e| ConnectError::RpcError(e))?;
@@ -240,7 +240,7 @@ impl Sniffer {
 
         // Unregister this handler from CJDNS router
         let conn = &mut self.cjdns;
-        cjdns_invoke!(conn, "UpperDistributor_unregisterHandler", "udpPort" = port as i64)
+        cjdns_invoke!(conn, "UpperDistributor_unregisterHandler", udpPort = port as i64)
             .await
             .map_err(|e| ConnectError::RpcError(e))?;
 

@@ -2,27 +2,37 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::{fs, io};
 
 use crate::errors::Error;
-use crate::ConnectionOptions;
+use crate::{ConnectionEndpoint, ConnectionOptions};
 
-const DEFAULT_ADDR: &'static str = "127.0.0.1";
-const DEFAULT_PORT: u16 = 11234;
-const DEFAULT_PASSWORD: &'static str = "NONE";
-const DEFAULT_CONFIG_FILE_NAME: &'static str = ".cjdnsadmin";
+pub(crate) const DEFAULT_ADDR: &str = "127.0.0.1";
+pub(crate) const DEFAULT_PORT: u16 = 11234;
+const DEFAULT_PIPE_PATH: &str = "cjdroute.sock";
+pub(crate) const DEFAULT_PASSWORD: &str = "NONE";
+const DEFAULT_CONFIG_FILE_NAME: &str = ".cjdnsadmin";
 
 /// Connection options. Can be loaded from a config file.
 #[derive(Clone, Default, PartialEq, Eq, Debug, Deserialize)]
 pub struct Opts {
-    /// Remote IP address (either IPv4 or IPv6).
+    /// Endpoint type. If `None`, default `Udp` is used.
+    #[serde(rename = "type")]
+    pub typ: Option<EndpointType>,
+
+    /// Remote IP address (either IPv4 or IPv6) for `Udp` endpoint.
     #[serde(rename = "addr")]
     pub addr: Option<String>,
 
-    /// Remote UDP port.
+    /// Remote UDP port for `Udp` endpoint.
     #[serde(rename = "port")]
     pub port: Option<u16>,
+
+    /// Local path to Unix domain socket or Windows named pipe for `Pipe` endpoint,
+    /// can be either absolute or relative to default pipe path for the target system.
+    #[serde(rename = "path")]
+    pub path: Option<String>,
 
     /// Password for authentication. If `None`, default "NONE" password is used.
     #[serde(rename = "password")]
@@ -40,7 +50,8 @@ pub struct Opts {
 impl Opts {
     pub(super) async fn into_connection_options(self) -> Result<ConnectionOptions, Error> {
         // Do we need to try to read config file?
-        let is_configured = (self.addr.is_some() || self.port.is_some() || self.password.is_some()) && self.config_file_path.is_none();
+        let is_configured = (self.typ.is_some() || self.addr.is_some() || self.port.is_some() || self.path.is_some() || self.password.is_some())
+            && self.config_file_path.is_none();
 
         // Options to use
         let mut opts = self;
@@ -62,12 +73,19 @@ impl Opts {
 
     fn build_connection_options(self, conf_file: Option<PathBuf>) -> ConnectionOptions {
         ConnectionOptions {
-            addr: self.addr.as_ref().map_or(DEFAULT_ADDR, |s| &s).to_string(),
-            port: self.port.unwrap_or(DEFAULT_PORT),
+            endpoint: match self.typ.unwrap_or_default() {
+                EndpointType::Udp => ConnectionEndpoint::Udp {
+                    addr: self.addr.as_ref().map_or(DEFAULT_ADDR, String::as_str).to_string(),
+                    port: self.port.unwrap_or(DEFAULT_PORT),
+                },
+                EndpointType::Pipe => ConnectionEndpoint::Pipe {
+                    path: self.path.as_ref().map_or(DEFAULT_PIPE_PATH, String::as_str).to_string(),
+                },
+            },
             password: self
                 .password
                 .as_ref()
-                .map_or_else(|| if self.anon { "" } else { DEFAULT_PASSWORD }, |s| &s)
+                .map_or_else(|| if self.anon { "" } else { DEFAULT_PASSWORD }, String::as_str)
                 .to_string(),
             used_config_file: conf_file.map(|path| path.to_string_lossy().into_owned()),
         }
@@ -80,18 +98,18 @@ impl Opts {
 
         if let Some(mut path) = dirs::home_dir() {
             path.push(DEFAULT_CONFIG_FILE_NAME);
-            return Some(path.into());
+            return Some(path);
         }
 
         None // Unable to locate HOME dir - unsupported platform?
     }
 
     fn parse_config(json: &[u8]) -> Result<Self, Error> {
-        serde_json::from_slice(json).map_err(|e| Error::BadConfigFile(e))
+        serde_json::from_slice(json).map_err(Error::BadConfigFile)
     }
 
     async fn read_config_file(file_path: &Path) -> Result<Self, Error> {
-        let json = fs::read(file_path).await.map_err(|e| Error::ConfigFileRead(e))?;
+        let json = fs::read(file_path).await.map_err(Error::ConfigFileRead)?;
         Self::parse_config(&json)
     }
 
@@ -104,16 +122,30 @@ impl Opts {
     }
 }
 
+/// Connection endpoint type.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
+#[non_exhaustive]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointType {
+    /// Represents remote UDP `addr:port` endpoint.
+    #[default]
+    Udp,
+
+    /// Represents local Unix domain socket / Windows named pipe endpoint.
+    Pipe,
+}
+
 #[test]
 fn test_build_connection_options() {
     let s = |s: &str| -> String { s.to_string() };
     let ss = |s: &str| -> Option<String> { Some(s.to_string()) };
+    let udp = |a: &str, p: u16| -> ConnectionEndpoint { ConnectionEndpoint::Udp { addr: s(a), port: p } };
+    let pipe = |p: &str| -> ConnectionEndpoint { ConnectionEndpoint::Pipe { path: s(p) } };
 
     assert_eq!(
         Opts::default().build_connection_options(None),
         ConnectionOptions {
-            addr: s("127.0.0.1"),
-            port: 11234,
+            endpoint: udp("127.0.0.1", 11234),
             password: s("NONE"),
             used_config_file: None,
         }
@@ -122,8 +154,7 @@ fn test_build_connection_options() {
     assert_eq!(
         Opts { anon: true, ..Opts::default() }.build_connection_options(None),
         ConnectionOptions {
-            addr: s("127.0.0.1"),
-            port: 11234,
+            endpoint: udp("127.0.0.1", 11234),
             password: s(""),
             used_config_file: None,
         }
@@ -136,8 +167,7 @@ fn test_build_connection_options() {
         }
         .build_connection_options(None),
         ConnectionOptions {
-            addr: s("192.168.1.1"),
-            port: 11234,
+            endpoint: udp("192.168.1.1", 11234),
             password: s("NONE"),
             used_config_file: None,
         }
@@ -150,8 +180,34 @@ fn test_build_connection_options() {
         }
         .build_connection_options(None),
         ConnectionOptions {
-            addr: s("127.0.0.1"),
-            port: 1234,
+            endpoint: udp("127.0.0.1", 1234),
+            password: s("NONE"),
+            used_config_file: None,
+        }
+    );
+
+    assert_eq!(
+        Opts {
+            typ: Some(EndpointType::Pipe),
+            ..Opts::default()
+        }
+        .build_connection_options(None),
+        ConnectionOptions {
+            endpoint: pipe("cjdroute.sock"),
+            password: s("NONE"),
+            used_config_file: None,
+        }
+    );
+
+    assert_eq!(
+        Opts {
+            typ: Some(EndpointType::Pipe),
+            path: ss("foobar.sock"),
+            ..Opts::default()
+        }
+        .build_connection_options(None),
+        ConnectionOptions {
+            endpoint: pipe("foobar.sock"),
             password: s("NONE"),
             used_config_file: None,
         }
@@ -164,8 +220,7 @@ fn test_build_connection_options() {
         }
         .build_connection_options(None),
         ConnectionOptions {
-            addr: s("127.0.0.1"),
-            port: 11234,
+            endpoint: udp("127.0.0.1", 11234),
             password: s("secret"),
             used_config_file: None,
         }
@@ -204,11 +259,21 @@ fn test_parse_config() {
     );
 
     assert_eq!(
-        c(r#"{ "addr": "192.168.1.1", "port": 1234, "password": "secret" }"#),
+        c(r#"{ "type": "udp", "addr": "192.168.1.1", "port": 1234, "password": "secret" }"#),
         Opts {
+            typ: Some(EndpointType::Udp),
             addr: s("192.168.1.1"),
             port: Some(1234),
             password: s("secret"),
+            ..Opts::default()
+        }
+    );
+
+    assert_eq!(
+        c(r#"{ "type": "pipe", "path": "cjdroutealt.sock" }"#),
+        Opts {
+            typ: Some(EndpointType::Pipe),
+            path: s("cjdroutealt.sock"),
             ..Opts::default()
         }
     );

@@ -7,19 +7,26 @@ authors = [
 edition = "2018"
 license = "GPL-3.0-or-later"
 description = "cjdns node admin lib & binary"
+rust-version = { workspace = true }
 
 [dependencies]
-eyre = { workspace = true }
+bytes = { workspace = true }
 dirs = { workspace = true }
+eyre = { workspace = true }
+futures-util = { workspace = true }
 hex = { workspace = true }
+log = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sodiumoxide = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["fs", "net", "macros", "time", "sync"] }
-log = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 cjdns-bencode = { workspace = true }
 cjdns-bytes = { workspace = true }
+
+[dev-dependencies]
+tokio-stream = "0.1"
