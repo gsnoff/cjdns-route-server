@@ -1,5 +1,6 @@
 /target
 .idea/
+.zed/
 config.json
 config.yaml
 nameserver.yaml

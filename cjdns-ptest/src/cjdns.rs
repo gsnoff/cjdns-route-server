@@ -35,8 +35,10 @@ pub struct Cjdns {
 impl Cjdns {
     pub async fn new(cac: &CjdnsAdminConfig) -> Result<Self> {
         let cjdns = cjdns_admin::connect(Some(Opts{
+            typ: None,
             addr: Some(cac.host.clone()),
             port: Some(cac.port),
+            path: None,
             password: Some(cac.pass.clone()),
             config_file_path: None,
             anon: false,
@@ -156,46 +158,46 @@ impl Cjdns {
 pub struct PeerStats {
     #[serde(rename = "addr")]
     pub addr: String,
-    
+
     #[serde(rename = "bytesIn")]
     pub bytes_in: i64,
-    
+
     #[serde(rename = "bytesOut")]
     pub bytes_out: i64,
-    
+
     #[serde(rename = "duplicates")]
     pub duplicates: u32,
-    
+
     #[serde(rename = "ifNum")]
     pub if_num: u32,
-    
+
     #[serde(rename = "isIncoming")]
     pub is_incoming: u8,
-    
+
     #[serde(rename = "last")]
     pub last: i64,
-    
+
     #[serde(rename = "lladdr")]
     pub lladdr: String,
 
     #[serde(rename = "lostPackets")]
     pub lost_packets: u32,
-    
+
     #[serde(rename = "noiseProto")]
     pub noise_proto: u32,
-    
+
     #[serde(rename = "receivedOutOfRange")]
     pub received_out_of_range: u32,
-    
+
     #[serde(rename = "receivedPackets")]
     pub received_packets: i64,
-    
+
     #[serde(rename = "recvKbps")]
     pub recv_kbps: u32,
-    
+
     #[serde(rename = "sendKbps")]
     pub send_kbps: u32,
-    
+
     #[serde(rename = "state")]
     pub state: String,
 
@@ -241,7 +243,7 @@ impl TryFrom<&Dict<'_>> for SwitchPingReply {
             ms: d.get("ms")?,
             path: d.get("path")?,
             result: d.get("result")?,
-            version: d.try_get("version")?, 
+            version: d.try_get("version")?,
             data: d.try_get("data")?,
             snode: d.try_get("snode")?,
         })

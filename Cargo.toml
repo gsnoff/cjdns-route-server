@@ -24,7 +24,11 @@ members = [
     "cjdns-pkt-abi",
 ]
 
+[workspace.package]
+rust-version = "1.87.0"
+
 [workspace.dependencies]
+bytes = "1.7"
 eyre = "0.6.12"
 dirs = "5"
 hex = "0.4"
@@ -37,9 +41,10 @@ libsodium-sys = { git = "https://github.com/cjdelisle/sodiumoxide", rev = "2c140
 ed25519 = "1.5.3" # Sodium includes this as "1" but we depend on things which are not available in older versions.
 thiserror = "1.0"
 tokio = { version = "^1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 warp = "0.3"
 tokio-tungstenite = "0.21"
-clap = { version = "4", features = [ "derive" ] }
+clap = { version = "4", features = ["derive"] }
 env_logger = "0.11"
 futures = "0.3"
 http = "1"
@@ -60,7 +65,7 @@ hickory-client = "0.24.1"
 async-trait = "0.1.83"
 alloy = { git = "https://github.com/alloy-rs/alloy", version = "0.6.4", rev = "v0.6.4", features = ["full","signer-mnemonic"] }
 alloy-sol-types = "0.8.0"
-futures-util = "0.3"
+futures-util = { version = "0.3", features = ["sink"] }
 itertools = "0.13.0"
 
 cjdns-admin = { path = "cjdns-admin" }

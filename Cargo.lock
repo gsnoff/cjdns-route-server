@@ -1088,10 +1088,12 @@ dependencies = [
 name = "cjdns-admin"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "cjdns-bencode",
  "cjdns-bytes",
  "dirs",
  "eyre",
+ "futures-util",
  "hex",
  "log",
  "rand 0.7.3",
@@ -1101,6 +1103,8 @@ dependencies = [
  "sodiumoxide",
  "thiserror",
  "tokio",
+ "tokio-stream",
+ "tokio-util",
 ]
 
 [[package]]

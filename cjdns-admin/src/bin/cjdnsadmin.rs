@@ -2,7 +2,10 @@
 
 use std::{env, path};
 
-use cjdns_bencode::{json, object::{Dict, Object}};
+use cjdns_bencode::{
+    json,
+    object::{Dict, Object},
+};
 use cjdns_bytes::message::Message;
 use eyre::Error;
 use regex::Regex;
@@ -17,7 +20,7 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Error> {
-    let mut cjdns = cjdns_admin::connect(None).await?;
+    let cjdns = cjdns_admin::connect(None).await?;
 
     let args = env::args().skip(1).collect::<Vec<_>>();
 
@@ -39,8 +42,7 @@ async fn run() -> Result<(), Error> {
 
         let res = cjdns.invoke(&fn_name, fn_args).await?;
         let mut msg = Message::new();
-        json::serialize(&mut msg, &Object::from(res))
-            .map_err(|_| Error::msg("failed to serialize response"))?;
+        json::serialize(&mut msg, &Object::from(res)).map_err(|_| Error::msg("failed to serialize response"))?;
         println!("{}", String::from_utf8(msg.as_vec())?);
     };
 
